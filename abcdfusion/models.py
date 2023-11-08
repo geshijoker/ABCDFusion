@@ -22,7 +22,8 @@ class LinearBlock(nn.Module):
 class ResidualBlock(nn.Module):
     def __init__(self, in_channels: int, emb_size: int):
         super(ResidualBlock, self).__init__()
-        self.linear1 = LinearBlock(in_channels, emb_size)
+        self.linear1 = nn.Sequential(LinearBlock(in_channels, emb_size),
+                                     nn.GELU())
         self.linear2 = LinearBlock(emb_size, in_channels)
         self.gelu = nn.GELU()
         
@@ -49,9 +50,9 @@ class BinaryMLP(nn.Module):
             ])
         self.dropout = nn.Dropout(p)
         if hidden_dim:
-            self.project = nn.Linear(hidden_dim, 1)
+            self.project = nn.Linear(hidden_dim, 2)
         else:
-            self.project = nn.Linear(sizes[-1], 1)
+            self.project = nn.Linear(sizes[-1], 2)
         
     def forward(self, x: Tensor)-> Tensor:
         for block in self.blocks:

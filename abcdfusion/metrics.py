@@ -22,6 +22,32 @@ class DiceLoss(nn.Module):
         union = torch.sum(pred_flat) + torch.sum(true_flat)
         
         return 1 - ((2. * intersection + self.smooth) / (union + self.smooth) )
+    
+class WeightedBCELoss(nn.Module):
+    """Computes the BCEloss weighted by manual class weights
+       Args:
+           weights (FloatTensor): The float tensor to define weights
+    """
+    def __init__(self, weights, reduction='mean'):
+        super(WeightedBCELoss, self).__init__()
+        if torch.is_tensor(weights):
+            self.weights = weights
+        else:
+            self.weights = torch.Tensor(weights)
+        assert len(self.weights) == 2, "The weights dimension is not 2!"
+        self.weights.requires_grad = False
+        self.reduction = reduction
+        
+    def forward(self, pred, target):
+        bceloss = nn.BCELoss(reduction='none')
+        loss = bceloss(pred, target)
+        loss *= self.weights.to(loss.device)
+        if self.reduction=='mean':
+            return loss.mean()
+        elif self.reduction=='sum':
+            return loss.sum()
+        else:
+            return loss
 
 class FocalLoss(nn.Module):
     """Computes the focal loss between input and target
@@ -62,8 +88,8 @@ class FocalLoss(nn.Module):
 
     def _get_weights(self, target: Tensor) -> Tensor:
         if self.weights is None:
-            return torch.ones(target.shape[0])
-        weights = target * self.weights
+            return torch.ones(target.shape[0], device=target.device)
+        weights = target * self.weights.to(target.device)
         return weights.sum(dim=-1)
 
     def _process_target(
@@ -73,7 +99,7 @@ class FocalLoss(nn.Module):
         #convert all ignore_index elements to zero to avoid error in one_hot
         #note - the choice of value 0 is arbitrary, but it should not matter as these elements will be ignored in the loss calculation
         target = target * (target!=self.ignore_index) 
-        target = target.view(-1)
+        target = target.view(-1).long()
         return one_hot(target, num_classes=num_classes)
 
     def _process_preds(self, x: Tensor) -> Tensor:
@@ -98,11 +124,12 @@ class FocalLoss(nn.Module):
                 classification or softmax for multi-class classification'
         )
         mask = target == self.ignore_index
-        mask = mask.view(-1)
-        x = self._process_preds(x)
+        # mask = mask.view(-1)
+        # x = self._process_preds(x)
         num_classes = x.shape[-1]
-        target = self._process_target(target, num_classes, mask)
+        # target = self._process_target(target, num_classes, mask)
         weights = self._get_weights(target).to(x.device)
+        print(target.shape, x.shape, mask.shape)
         pt = self._calc_pt(target, x, mask)
         focal = 1 - pt
         nll = -torch.log(self.eps + pt)
