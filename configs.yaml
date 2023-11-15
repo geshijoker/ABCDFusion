@@ -15,4 +15,6 @@ Auxiliary:
     OTHER_DATA: 'otherdata.csv'
     DTI_DATA: 'DTIConnectData.csv'
     RS_DATA: 'restingstatedata.csv'
+    DIF_DATA: 'diffusivity.csv'
+    COR_DATA: 'corticalthickness.csv'
     OUTCOME: 'outcome.csv'
