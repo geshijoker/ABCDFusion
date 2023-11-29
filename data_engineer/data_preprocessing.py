@@ -20,7 +20,7 @@ else:
 sheet_names = dfs.keys()
 print('Raw data loaded. The loaded panda frames are', sheet_names)
 
-# select shared data
+select shared data
 shared_subjects = set(dfs['outcome']['src_subject_id']).intersection(\
     set(dfs['DTIConnectData']['src_subject_id']),\
     set(dfs['restingstatedata']['src_subject_id']),\

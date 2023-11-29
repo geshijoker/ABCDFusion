@@ -6,11 +6,13 @@ from torch import nn
 from torch import Tensor
 from torchinfo import summary
 
+import dgl
+from dgl.nn import GraphConv
+
 class LinearBlock(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
         self.net = nn.Sequential(
-            nn.LayerNorm(in_channels),
             nn.Linear(in_channels, out_channels),
             nn.GELU(),
         )
@@ -59,6 +61,30 @@ class BinaryMLP(nn.Module):
             x = block(x)
         x = self.dropout(x)
         x = self.project(x)
+        return x
+    
+# Define a GCN model that considers edge weights
+class GCNBlock(nn.Module):
+    def __init__(self, in_feat, out_feat):
+        self.conv = GraphConv(in_feat, out_feats)
+        
+    def forward(self, g, x):
+        x = torch.relu(self.conv(g, x))
+        return x
+
+class GCNWithEdgeWeights(nn.Module):
+    def __init__(self, in_feats, hid_sizes, out_feats):
+        super(GCNWithEdgeWeights, self).__init__()
+        self.blocks = nn.ModuleList([
+                GCNBlock(in_feats, hidden_sizes[0]),
+                *[GCNBlock(sizes[i], sizes[i+1]) i in range(len(hid_sizes)-1)]
+            ])
+        self.project = GraphConv(hid_sizes[-1], out_feats)
+
+    def forward(self, g, features, edge_weights):
+        g.edata['weight'] = edge_weights
+        x = self.blocks(g, features)
+        x = self.project(g, x)
         return x
     
 if __name__ == "__main__":
