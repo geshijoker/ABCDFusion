@@ -32,7 +32,7 @@ from matplotlib import pyplot as plt
 from abcdfusion import metrics
 from abcdfusion.models import BinaryMLP
 from abcdfusion.utils import check_make_dir
-from abcdfusion import get_abcd, train_epoch_single, test_single
+from abcdfusion import get_abcd, train_epoch_single, test_single, preprocess
 
 """
 python examples/single_modality_train.py -c ./config.yaml -e ./exps -n 0 -id 0 -ls 32 64 32 -a mlp -l ce -s 42 -g -1 -f 1 -ne 10 -lr 0.0001 -bs 1000 -t -b -d
@@ -47,11 +47,7 @@ parser.add_argument('--name', '-n', type=str, required=True,
                     help='name of run', )
 parser.add_argument('--index', '-id', type=int, required=True,
                     help='which modality to use')
-parser.add_argument('--layer_sizes', '-ls', nargs="+", type=int, required=True,
-                    help='the sizes of layers of the model')
-parser.add_argument('--architecture', '-a', type=str, default='mlp',
-                    help='model architecture')
-parser.add_argument('--loss', '-l', type=str, default='ce',
+parser.add_argument('--loss', '-l', type=str, default='bce',
                     help='the loss function to use')
 parser.add_argument('--resume', '-r', type=str, default=None, 
                     help='resume from checkpoint')
@@ -65,8 +61,6 @@ parser.add_argument('--num_epochs', '-ne', type=int, default=100,
                     help='the number of epochs for training')
 parser.add_argument('--learning_rate', '-lr', type=float, default=0.0001,
                     help='the learning rate of training')
-parser.add_argument('--batch_size', '-bs', type=int, default=32,
-                    help='the batch size of the data')
 parser.add_argument('--benchmark', '-b', action='store_true',
                     help='using benchmark algorithms')
 parser.add_argument('--debug', '-d', action='store_true',
@@ -125,7 +119,6 @@ else
 index = args.index
 layer_sizes = args.layer_sizes
 lr = args.learning_rate
-batch_size=args.batch_size
 frequency = args.frequency
 test_while_train = args.test_while_train
 num_epochs = args.num_epochs
@@ -139,10 +132,9 @@ dti_file = os.path.join(DATA_PATH, configs['DTI_DATA'])
 rsfmri_file = os.path.join(DATA_PATH, configs['RS_DATA'])
 other_file = os.path.join(DATA_PATH, configs['OTHER_DATA'])
 cort_file = os.path.join(DATA_PATH, configs['COR_DATA'])
-diff_file = os.path.join(DATA_PATH, configs['DIF_DATA'])
 outcome_file = os.path.join(DATA_PATH, configs['OUTCOME'])
 
-abcd_dataset = get_abcd(dti_file, rsfmri_file, other_file, cort_file, diff_file, outcome_file)
+abcd_dataset = get_abcd(dti_file, rsfmri_file, other_file, cort_file, outcome_file)
 train_loader, valid_loader = create_datasets(abcd_dataset, batch_size, 0, 0.2, shuffle=True)
 data = next(iter(valid_loader))
 print('modality size: ', data[index].shape, data[-1].shape)
@@ -155,31 +147,35 @@ if args.architecture == 'mlp':
 out = model(x)
 print('output shape', out.shape) 
 
-if args.loss == 'ce':
-    print('use CrossEntropy')
-    criterion = nn.CrossEntropyLoss() 
+if args.loss == 'bce':
+    print('use Binary CrossEntropy with logits')
+    criterion = nn.BCEWithLogitsLoss(pos_weight=10)
 else:
     print(f'{args.loss} not supported, use default CrossEntropyLoss')
-    criterion = nn.CrossEntropyLoss() 
+    criterion = nn.BCEWithLogitsLoss(pos_weight=10)
 
-optimizer = optim.AdamW(model.parameters(), lr=lr)
+optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = lr_scheduler.StepLR(optimizer, step_size=20)
+
+start_epoch = 0
+
+if args.resume:
+    checkpoint = torch.load(args.resume, map_location=device)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    start_epoch = checkpoint['epoch']
+    
 
 def save_checkpoint(checkpoint):
     utctime = datetime.datetime.now(datetime.timezone.utc).strftime("%m-%d-%Y-%H:%M:%S")
     model_path = os.path.join(log_path, f'iter{checkpoint}-' + utctime + '.pt')
     torch.save({
         'model_state_dict': model.state_dict(),
-        'scheduler_state_dict': scheduler.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-        'rng_state': torch.get_rng_state(),
         'epoch': checkpoint,
         }, model_path)
 
 print('Starting training loop; initial compile can take a while...')
 since = time.time()
 model.train()   # Set model to evaluate mode
-start_epoch = 0
 
 pbar = trange(num_epochs, desc='Epoch', unit='epoch', initial=start_epoch, position=0)
 # Iterate over data.

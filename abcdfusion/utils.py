@@ -41,5 +41,5 @@ def clean_directory(path):
                 print(f"Removed directory: {dir_path}")
 
 if __name__ == "__main__":
-    target_directory = "../"  # Change this to the root directory where you want to start the cleanup
+    target_directory = "./"  # Change this to the root directory where you want to start the cleanup
     clean_directory(target_directory)

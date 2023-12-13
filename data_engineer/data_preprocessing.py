@@ -83,5 +83,5 @@ filtered_dfs['Corticalthickness'].drop(['age', 'sex', 'site'], axis=1, inplace=T
 for sheet_name, df in filtered_dfs.items():
     print('check the column of {}'.format(sheet_name), df.columns.values[:4])
     output_file = '{}.csv'.format(sheet_name)
-    df.to_csv(os.path.join(ROOT_PATH, DATA_PATH, output_file), index=False)
+    df.to_csv(os.path.join(ROOT_PATH, DATA_PATH, output_file), index=True)
     print('{} is saved'.format(sheet_name))

@@ -36,18 +36,10 @@ parser.add_argument('--data', '-d', type=str, required=True,
                     help='data folder to load data')
 parser.add_argument('--resume', '-r', type=str, required=True, 
                     help='resume from checkpoint')
-parser.add_argument('--architecture', '-a', type=str, default='unet',
-                    help='model architecture')
 parser.add_argument('--seed', '-s', type=int, default=None, 
                     help='which seed for random number generator to use')
 parser.add_argument('--gpu', '-g', type=int, default=0,
                     help='which GPU to use, only when disable-cuda not specified')
-parser.add_argument('--percentage', '-p', type=float, default=1.0, 
-                    help='the percentage of data used for training')
-parser.add_argument('--arc_depth', '-ad', type=int, default=5,
-                    help='the depth of the model')
-parser.add_argument('--arc_width', '-aw', type=int, default=32,
-                    help='the width of the model')
 parser.add_argument('--input_size', '-ip', type=int, default=288,
                     help='the size of input')
 parser.add_argument('--batch_size', '-bs', type=int, default=32,
@@ -118,28 +110,6 @@ read_image_type=1
 ignore_segs = False
 
 data_transform, target_transform = get_default_transforms('fiber', input_size)
-    
-downward_params = {
-    'in_channels': 3, 
-    'emb_sizes': [1, 2, 4, 8, 16], 
-    'out_channels': [1, 2, 4, 8, 16],
-    'kernel_sizes': [3, 3, 3 ,3 ,3], 
-    'paddings': [1, 1, 1, 1, 1], 
-    'batch_norm_first': False,
-}
-upward_params = {
-    'in_channels': [16, 32, 16, 8, 4],
-    'emb_sizes': [32, 16, 8, 4, 2], 
-    'out_channels': [16, 8, 4, 2, 1],
-    'kernel_sizes': [3, 3, 3, 3, 3], 
-    'paddings': [1, 1, 1, 1, 1], 
-    'batch_norm_first': False, 
-    'bilinear': True,
-}
-output_params = {
-    'in_channels': 2,
-    'n_classes': n_classes,
-}
 
 downward_params['emb_sizes'] = [downward_params['emb_sizes'][i]*arc_width for i in range(min(len(downward_params['emb_sizes']), arc_depth))]
 downward_params['out_channels'] = [downward_params['out_channels'][i]*arc_width for i in range(min(len(downward_params['out_channels']), arc_depth))]
@@ -182,8 +152,6 @@ selected = list(range(num))
 dataset = Subset(dataset, selected)
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=n_workers)
 
-if args.data_parallel:
-    model= nn.DataParallel(model)
 model = model.to(device)
 
 checkpoint = torch.load(model_path, map_location=device)

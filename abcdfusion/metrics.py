@@ -1,3 +1,7 @@
+from typing import List
+import numpy as np
+from sklearn.metrics import confusion_matrix
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -6,6 +10,68 @@ from torch import Tensor
 from typing import Union
 
 EPS = 1e-7
+
+def get_accuracy(cfm):
+    tp = cfm[1][1]
+    fp = cfm[0][1]
+    fn = cfm[1][0]
+    tn = cfm[0][0]
+    return (tp+tn)/(tp+fp+fn+tn)
+
+def get_precision(cfm):
+    tp = cfm[1][1]
+    fp = cfm[0][1]
+    fn = cfm[1][0]
+    tn = cfm[0][0]
+    return tp/(tp+fp)
+
+def get_recall(cfm):
+    tp = cfm[1][1]
+    fp = cfm[0][1]
+    fn = cfm[1][0]
+    tn = cfm[0][0]
+    return tp/(tp+fn)
+
+def get_f1(cfm):
+    precision = get_precision(cfm)
+    recall = get_recall(cfm)
+    return 2*precision*recall/(precision+recall)
+
+def get_confusion_matrix(preds, gtrue):
+    return confusion_matrix(gtrue, preds)
+
+def get_group_confusion_matrix(preds, gtrue, groups):
+    cfm = {}
+    group_set = set(groups)
+    for group in group_set:
+        mask = groups==group
+        preds_group = preds[mask]
+        gtrue_group = gtrue[mask]
+        cfm[group] = confusion_matrix(gtrue_group, preds_group)
+    return cfm
+    
+def count_support(cfm):
+    return np.sum(cfm)
+
+def compute_metric(cfm, metrics_list:List['str']=None):
+    ans = {}
+    for metric_name in metrics_list:
+        if metric_name == 'accuracy':
+            ans[metric_name] = get_accuracy(cfm)
+        elif metric_name == 'precision':
+            ans[metric_name] = get_precision(cfm)
+        elif metric_name == 'recall':
+            ans[metric_name] = get_recall(cfm)
+        else:
+            sys.exit('{} is not supported'.format(metric_name))
+    return ans
+    
+def compute_metrics(cfm_dict, metrics_list:List['str']=None):
+    ans = {}
+    for group, cfm in cfm_dict.items():
+        ans[group] = {'support': int(count_support(cfm))}
+        ans[group].update(compute_metric(cfm, metrics_list))
+    return ans
 
 class DiceLoss(nn.Module):
     def __init__(self, softmax=False):

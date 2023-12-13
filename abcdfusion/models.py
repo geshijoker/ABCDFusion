@@ -38,7 +38,7 @@ class ResidualBlock(nn.Module):
         return out
 
 class BinaryMLP(nn.Module):
-    def __init__(self, in_channels: int, sizes: List[int], p: int=0.2, hidden_dim: int=None):
+    def __init__(self, in_channels: int, sizes: List[int], hidden_dim: int=None):
         super().__init__()
         if hidden_dim:
             self.blocks = nn.ModuleList([
@@ -50,15 +50,19 @@ class BinaryMLP(nn.Module):
                 LinearBlock(in_channels, sizes[0]),
                 *[LinearBlock(sizes[i], sizes[i+1]) for i in range(len(sizes)-1)]
             ])
-        self.dropout = nn.Dropout(p)
-        if hidden_dim:
-            self.project = nn.Linear(hidden_dim, 2)
-        else:
-            self.project = nn.Linear(sizes[-1], 2)
         
     def forward(self, x: Tensor)-> Tensor:
         for block in self.blocks:
             x = block(x)
+        return x
+    
+class LinearClassifier(nn.Module):
+    def __init__(self, in_channels: int, p: int=0.1):
+        super().__init__()
+        self.dropout = nn.Dropout(p)
+        self.project = nn.Linear(in_channels, 1)
+        
+    def forward(self, x: Tensor)-> Tensor:
         x = self.dropout(x)
         x = self.project(x)
         return x
@@ -77,7 +81,7 @@ class GCNWithEdgeWeights(nn.Module):
         super(GCNWithEdgeWeights, self).__init__()
         self.blocks = nn.ModuleList([
                 GCNBlock(in_feats, hidden_sizes[0]),
-                *[GCNBlock(sizes[i], sizes[i+1]) i in range(len(hid_sizes)-1)]
+                *[GCNBlock(sizes[i], sizes[i+1]) for i in range(len(hid_sizes)-1)]
             ])
         self.project = GraphConv(hid_sizes[-1], out_feats)
 
@@ -88,7 +92,6 @@ class GCNWithEdgeWeights(nn.Module):
         return x
     
 if __name__ == "__main__":
-
     in_channels = 10
     hidden_dim = 20
     sizes = [30, 30, 30]

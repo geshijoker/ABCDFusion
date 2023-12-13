@@ -1,7 +1,11 @@
 import csv
+import yaml
 import os
+import time
 import pandas as pd
 import numpy as np
+from tqdm import tqdm, trange
+from sklearn.model_selection import KFold, GroupKFold, LeaveOneGroupOut, LeaveOneOut
 
 import torch
 import torch.nn as nn
@@ -10,62 +14,53 @@ from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 
 from abcdfusion import metrics
-from tqdm import tqdm, trange
+from abcdfusion import models
+from abcdfusion import utils
 
-def get_abcd(DTI_csv, rsfMRI_csv, other_csv, cort_csv, diff_csv, label_csv):
-    df_dti = pd.read_csv(DTI_csv)
-    df_rs = pd.read_csv(rsfMRI_csv)
-    df_other = pd.read_csv(other_csv)
-    df_cort = pd.read_csv(cort_csv)
-    df_diff = pd.read_csv(diff_csv)
-    df_labels = pd.read_csv(label_csv)
+def get_abcd(DTI_csv, rsfMRI_csv, other_csv, cort_csv, label_csv):
+    df_dti = pd.read_csv(DTI_csv, index_col=0)
+    df_rs = pd.read_csv(rsfMRI_csv, index_col=0)
+    df_other = pd.read_csv(other_csv, index_col=0)
+    df_cort = pd.read_csv(cort_csv, index_col=0)
+    df_labels = pd.read_csv(label_csv, index_col=0)
 
-    X_dti = torch.Tensor(df_dti.iloc[:,3:].values)
-    X_rs = torch.Tensor(df_rs.iloc[:,2:].values)
-    X_other = torch.Tensor(df_other.iloc[:,1:].values)
-    X_cort = torch.Tensor(df_cort.iloc[:,1:].values)
-    X_diff = torch.Tensor(df_diff.iloc[:,1:].values)
-    y = torch.Tensor(df_labels.iloc[:,1].values)
+    X_dti = df_dti.iloc[:,:].values
+    X_rs = df_rs.iloc[:,:].values
+    X_other = df_other.iloc[:,:].values
+    X_cort = df_cort.iloc[:,:].values
+    X_anno = df_labels.iloc[:,:].values
 
-    return TensorDataset(X_dti, X_rs, X_other, X_cort, X_diff, y)
+    return [X_dti, X_rs, X_other, X_cort, X_anno]
 
-def create_datasets(dataset, batch_size, num_workers=0, valid_size=0.2, shuffle=True):
+def get_cv_splits(n_splits=0, group_site=True):
+    # groups: site
+    if n_splits<=0 and group_site:
+        splitter = LeaveOneGroupOut()
+    elif n_splits>0 and group_site:
+        splitter = GroupKFold(n_splits=n_splits)
+    elif n_splits<=0 and not group_site:
+        splitter = LeaveOneOut()
+    else:
+        splitter = KFold(n_splits=n_splits)
+    return splitter
+
+def create_datasets(arrays, y):
     # obtain training indices that will be used for validation
+    # groups: age, sex, site
+    
+    arrays = [torch.Tensor(array) for array in arrays]
+    dataset = TensorDataset(*arrays, torch.Tensor(y))
     num_data = len(dataset)
-    if shuffle:
-        indices = list(range(num_data))
-    np.random.shuffle(indices)
-    split = int(np.floor(valid_size * num_data))
-    valid_idx, train_idx = indices[:split], indices[split:]
+    dataloader = DataLoader(dataset, batch_size=num_data, shuffle=False)
+    
+    return dataloader
 
-    # define samplers for obtaining training and validation batches
-    train_sampler = SubsetRandomSampler(train_idx)
-    valid_sampler = SubsetRandomSampler(valid_idx)
-    
-    # load training data in batches
-    train_loader = DataLoader(dataset,
-                              batch_size=batch_size,
-                              sampler=train_sampler,
-                              num_workers=num_workers)
-    
-    # load validation data in batches
-    valid_loader = DataLoader(dataset,
-                              batch_size=batch_size,
-                              sampler=valid_sampler,
-                              num_workers=num_workers)
-    
-    return train_loader, valid_loader
-
-def train_epoch_single(model, dataloader, index, criterion, optimizer, scheduler, device):
+def train_epoch_single(model, dataloader, criterion, optimizer, device):
     epoch_loss = 0.0
     epoch_acc = 0.0
     count = 0
 
-    piter = tqdm(dataloader, desc='Train', unit='batch', position=1, leave=False)
-    for data in piter:
-        
-        inputs = data[index]
-        targets = data[-1]
+    for inputs, targets in dataloader:
         inputs = inputs.to(device)
         targets = targets.to(device)
 
@@ -75,7 +70,7 @@ def train_epoch_single(model, dataloader, index, criterion, optimizer, scheduler
         optimizer.zero_grad()
 
         outputs = model(inputs)
-        _, preds = torch.max(outputs, 1)
+        preds = torch.round(outputs)
         loss = criterion(outputs, targets)
 
         loss.backward()
@@ -86,9 +81,7 @@ def train_epoch_single(model, dataloader, index, criterion, optimizer, scheduler
         epoch_acc = ((preds == targets).sum()/np.prod(preds.size())).item() * batch_size/nxt_count + epoch_acc * count/nxt_count
         
         count = nxt_count
-        piter.set_postfix(accuracy=100. * epoch_acc)
 
-    scheduler.step()
     train_stats = {
         'train_loss': epoch_loss,
         'train_acc': 100. * epoch_acc,
@@ -96,7 +89,7 @@ def train_epoch_single(model, dataloader, index, criterion, optimizer, scheduler
     
     return model, train_stats
 
-def test_single(model, dataloader, index, device):
+def test_single(model, dataloader, device):
     since = time.time()
     model.eval()   # Set model to evaluate mode
     
@@ -105,11 +98,7 @@ def test_single(model, dataloader, index, device):
 
     # Iterate over data.
     with torch.no_grad():
-        piter = tqdm(dataloader, desc='Test', unit='batch')
-        for data in piter:
-
-            inputs = data[index]
-            targets = data[-1]
+        for inputs, targets in dataloader:
             inputs = inputs.to(device)
             targets = targets.to(device)
             
@@ -117,7 +106,7 @@ def test_single(model, dataloader, index, device):
             count += batch_size
 
             outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
+            preds = torch.round(outputs)
 
             # statistics
             corrects += torch.sum(preds == targets.data)/np.prod(preds.size())*batch_size
@@ -131,18 +120,23 @@ def test_single(model, dataloader, index, device):
         "test_acc": 100. * acc,
     }
 
-    return test_stats
+    return preds.detach().cpu().numpy(), test_stats
         
 if __name__=='__main__':
-    DATA_PATH = '../data/'
-    dti_file = os.path.join(DATA_PATH, 'DTIConnectData.csv')
-    rsfmri_file = os.path.join(DATA_PATH, 'restingstatedata.csv')
-    other_file = os.path.join(DATA_PATH, 'otherdata.csv')
-    cort_file = os.path.join(DATA_PATH, 'corticalthickness.csv')
-    diff_file = os.path.join(DATA_PATH, 'diffusivity.csv')
-    outcome_file = os.path.join(DATA_PATH, 'outcome.csv')
+    config_file = 'configs.yaml'
+    with open(config_file, 'r') as infile:
+        try:
+            configs = yaml.safe_load(infile)
+        except yaml.YAMLError as exc:
+            sys.exit(exc)
+            
+    auxiliary = configs['Auxiliary']
+    DATA_PATH = auxiliary['DATA_PATH']
+    dti_file = os.path.join(DATA_PATH, auxiliary['DTI_DATA'])
+    rsfmri_file = os.path.join(DATA_PATH, auxiliary['RS_DATA'])
+    other_file = os.path.join(DATA_PATH, auxiliary['OTHER_DATA'])
+    cort_file = os.path.join(DATA_PATH, auxiliary['COR_DATA'])
+    outcome_file = os.path.join(DATA_PATH, auxiliary['OUTCOME'])
     
-    abcd_dataset = get_abcd(dti_file, rsfmri_file, other_file, cort_file, diff_file, outcome_file)
-    dataloader = DataLoader(abcd_dataset, batch_size=20, shuffle=False)
-    dti, rs, other, cort, diff, y = next(iter(dataloader))
-    print(dti.shape, rs.shape, other.shape, cort.shape, diff.shape, y.shape)
+    dti, rs, other, cort, y = get_abcd(dti_file, rsfmri_file, other_file, cort_file, outcome_file)
+    print(dti.shape, rs.shape, other.shape, cort.shape, y.shape)
