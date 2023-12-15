@@ -41,7 +41,7 @@ from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_mul
 
 """
 example command to run the script:
-python examples/multi_modalities_cv.py -c ./configs.yaml -e ./exps/multi -n 0 -m DTI RS CORT OTHER -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
+python examples/multi_modalities_cv.py -c ./configs.yaml -e ./runs/multi -n 0 -m DTI RS CORT OTHER -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
 """
 
 parser = argparse.ArgumentParser(description='Model Cross Validation')

@@ -41,7 +41,7 @@ from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_sin
 
 """
 example command to run the script:
-python examples/single_modality_cv.py -c ./configs.yaml -e ./exps/single/DTI -n 0 -m DTI -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
+python examples/single_modality_cv.py -c ./configs.yaml -e ./runs/single/DTI -n 0 -m DTI -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
 """
 
 parser = argparse.ArgumentParser(description='Model Cross Validation')
