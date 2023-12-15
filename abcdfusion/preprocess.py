@@ -18,19 +18,19 @@ def get_preprocess(arrays, modalities, group_site=True, combine=True):
             X.append(preprocess_dti(arrays[0], [age, sex]))
         if 'RS' in modalities:
             X.append(preprocess_rs(arrays[1], [age, sex]))
-        if 'OTHER' in modalities:
-            X.append(preprocess_other(arrays[2], [sex]))
         if 'CORT' in modalities:
             X.append(preprocess_cort(arrays[3], [age, sex]))
+        if 'OTHER' in modalities:
+            X.append(preprocess_other(arrays[2], [sex]))
     else:
         if 'DTI' in modalities:
             X.append(preprocess_dti(arrays[0]))
         if 'RS' in modalities:
             X.append(preprocess_rs(arrays[1]))
-        if 'OTHER' in modalities:
-            X.append(preprocess_other(arrays[2]))
         if 'CORT' in modalities:
             X.append(preprocess_cort(arrays[3]))
+        if 'OTHER' in modalities:
+            X.append(preprocess_other(arrays[2]))
     
     if group_site:
         return X, y, groups

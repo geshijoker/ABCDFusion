@@ -11,41 +11,29 @@ METRICS:
 
 DTI:
     architecture: 'mlp'
-    optimizer: 'Adam'
-    lr: 0.0001
     layers:
         - 50
         - 50
         - 50
-    dropout: 0.1
     
 RS:
     architecture: 'mlp'
-    optimizer: 'Adam'
-    lr: 0.0001
     layers:
         - 100
         - 100
         - 100
-    dropout: 0.1
-    
-OTHER:
-    architecture: 'mlp'
-    optimizer: 'SGD'
-    lr: 0.0001
-    layers:
-        - 20
-    dropout: 0.0
     
 CORT:
     architecture: 'mlp'
-    optimizer: 'Adam'
-    lr: 0.0001
     layers:
         - 150
         - 150
         - 150
-    dropout: 0.1
+    
+OTHER:
+    architecture: 'mlp'
+    layers:
+        - 20
 
 Auxiliary:
     ROOT_PATH: './'

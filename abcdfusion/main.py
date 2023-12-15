@@ -121,6 +121,73 @@ def test_single(model, dataloader, device):
     }
 
     return preds.detach().cpu().numpy(), test_stats
+
+def train_epoch_multi(model, dataloader, criterion, optimizer, device):
+    epoch_loss = 0.0
+    epoch_acc = 0.0
+    count = 0
+
+    for data in dataloader:
+        inputs = [inp.to(device) for inp in data[:-1]]
+        targets = data[-1].to(device)
+
+        batch_size = inputs[0].size(0)
+        nxt_count = count+batch_size
+        # zero the parameter gradients
+        optimizer.zero_grad()
+
+        outputs = model(inputs)
+        preds = torch.round(outputs)
+        loss = criterion(outputs, targets)
+
+        loss.backward()
+        optimizer.step()
+
+        # statistics
+        epoch_loss = loss.item() * batch_size/nxt_count + epoch_loss * count/nxt_count
+        epoch_acc = ((preds == targets).sum()/np.prod(preds.size())).item() * batch_size/nxt_count + epoch_acc * count/nxt_count
+        
+        count = nxt_count
+
+    train_stats = {
+        'train_loss': epoch_loss,
+        'train_acc': 100. * epoch_acc,
+    }
+    
+    return model, train_stats
+
+def test_multi(model, dataloader, device):
+    since = time.time()
+    model.eval()   # Set model to evaluate mode
+    
+    corrects = 0
+    count = 0
+
+    # Iterate over data.
+    with torch.no_grad():
+        for data in dataloader:
+            inputs = [inp.to(device) for inp in data[:-1]]
+            targets = data[-1].to(device)
+            
+            batch_size = inputs[0].size(0)
+            count += batch_size
+
+            outputs = model(inputs)
+            preds = torch.round(outputs)
+
+            # statistics
+            corrects += torch.sum(preds == targets.data)/np.prod(preds.size())*batch_size
+
+    acc = corrects.double().item() / count
+
+    time_elapsed = time.time() - since
+    print(f'Testing complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s, Test Acc: {100. * acc}')
+    
+    test_stats = {
+        "test_acc": 100. * acc,
+    }
+
+    return preds.detach().cpu().numpy(), test_stats
         
 if __name__=='__main__':
     config_file = 'configs.yaml'

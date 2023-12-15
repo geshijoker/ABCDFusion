@@ -34,14 +34,14 @@ print('current working directory is', current_working_directory)
 sys.path.append(current_working_directory) 
 
 from abcdfusion import metrics
-from abcdfusion.models import BinaryMLP, LinearClassifier
+from abcdfusion.models import BinaryMLP, LinearClassifier, Ensemble
 from abcdfusion.utils import check_make_dir
 from abcdfusion.preprocess import get_preprocess
-from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_single, test_single
+from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_multi, test_multi
 
 """
 example command to run the script:
-python examples/single_modality_cv.py -c ./configs.yaml -e ./exps/single/DTI -n 0 -m DTI -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
+python examples/multi_modalities_cv.py -c ./configs.yaml -e ./exps/multi -n 0 -m DTI RS CORT OTHER -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
 """
 
 parser = argparse.ArgumentParser(description='Model Cross Validation')
@@ -51,8 +51,8 @@ parser.add_argument('--experiment', '-e', type=str, required=True,
                     help='name of the experiment')
 parser.add_argument('--name', '-n', type=str, required=True, 
                     help='name of run', )
-parser.add_argument('--modality', '-m', choices=['DTI', 'RS', 'OTHER', 'CORT'], required=True,
-                    help='which modality to use')
+parser.add_argument('--modalities', '-m', choices=['DTI', 'RS', 'OTHER', 'CORT'], 
+                    nargs='+', required=True, help='which modalities to use')
 parser.add_argument('--loss', '-l', type=str, default='bce',
                     help='the loss function to use')
 parser.add_argument('--seed', '-s', type=int, default=None, 
@@ -124,7 +124,7 @@ else:
     torch.autograd.set_detect_anomaly(False)
     sys.stdout = open(os.path.join(log_path, 'log.txt'), 'w')
     
-modality = args.modality.upper()
+modalities = [modality.upper() for modality in args.modalities]
 optmizer_name = args.optmizer
 lr = float(args.learning_rate)
 p = float(args.drop_out)
@@ -155,30 +155,87 @@ other_file = os.path.join(DATA_PATH, auxiliary['OTHER_DATA'])
 outcome_file = os.path.join(DATA_PATH, auxiliary['OUTCOME'])
 
 desired_metrics = configs['METRICS']
-model_params = configs[modality]
+
+modality2index = {}
+index2modality = {}
+n_modality = 0
+if 'DTI' in modalities:
+    dti_model_params = configs['DTI']
+    modality2index['DTI'] = n_modality
+    index2modality[n_modality] = 'DTI'
+    n_modality += 1
+if 'RS' in modalities:
+    rs_model_params = configs['RS']
+    modality2index['RS'] = n_modality
+    index2modality[n_modality] = 'RS'
+    n_modality += 1
+if 'CORT' in modalities:
+    cort_model_params = configs['CORT']
+    modality2index['CORT'] = n_modality
+    index2modality[n_modality] = 'CORT'
+    n_modality += 1
+if 'OTHER' in modalities:
+    other_model_params = configs['OTHER']
+    modality2index['OTHER'] = n_modality
+    index2modality[n_modality] = 'OTHER'
+    n_modality += 1
 
 metrics_dict = {}
 arrays = get_abcd(dti_file, rs_file, other_file, cort_file, outcome_file)
-X, y, groups = get_preprocess(arrays, [modality], group_site=True, combine=True)
+X, y, groups = get_preprocess(arrays, modalities, group_site=True, combine=True)
 splitter = get_cv_splits(n_splits=0, group_site=True)
 
 for i, (train_index, test_index) in enumerate(splitter.split(X[0], y, groups=groups)):
     fold_groups = ','.join([str(int(group)) for group in set(groups[test_index])])
-    print(f"Fold {i}; Sites {fold_groups}; There are {len(train_index)} training subjects and {len(test_index)} testing subjects.")
-    input_size = len(X[0][0])
+    print(f"Fold {i}; Test Sites {fold_groups}; There are {len(train_index)} training subjects and {len(test_index)} testing subjects.")
+    input_sizes = {}
+    for index, mod in index2modality.items():
+        input_sizes[mod] = len(X[index][0])
     
-    if model_params['architecture'] == 'mlp':
-        model = nn.Sequential(
-            BinaryMLP(input_size, model_params['layers']),
-            LinearClassifier(model_params['layers'][-1], p=p)
-        )
-    out = model(torch.rand(1, input_size))
+    feature_extractors = []
+    output_sizes = {}
+    if dti_model_params:
+        if dti_model_params['architecture'] == 'mlp':
+            dti_model = BinaryMLP(input_sizes['DTI'], dti_model_params['layers'])
+            out = dti_model(torch.rand(1, input_sizes['DTI']))
+            output_sizes['DTI'] = len(out[0])
+            feature_extractors.append(dti_model)
+    if rs_model_params:
+        if rs_model_params['architecture'] == 'mlp':
+            rs_model = BinaryMLP(input_sizes['RS'], rs_model_params['layers'])
+            out = rs_model(torch.rand(1, input_sizes['RS']))
+            output_sizes['RS'] = len(out[0])
+            feature_extractors.append(rs_model)
+    if cort_model_params:
+        if cort_model_params['architecture'] == 'mlp':
+            cort_model = BinaryMLP(input_sizes['CORT'], cort_model_params['layers'])
+            out = cort_model(torch.rand(1, input_sizes['CORT']))
+            output_sizes['CORT'] = len(out[0])
+            feature_extractors.append(cort_model)
+    if other_model_params:
+        if other_model_params['architecture'] == 'mlp':
+            other_model = BinaryMLP(input_sizes['OTHER'], other_model_params['layers'])
+            out = other_model(torch.rand(1, input_sizes['OTHER']))
+            output_sizes['OTHER'] = len(out[0])
+            feature_extractors.append(other_model)
+    discriminator = LinearClassifier(sum(output_sizes.values()), p=p)
+    model = Ensemble(discriminator, *feature_extractors)
+            
+    examplar = []
+    for mod, size in input_sizes.items():
+        examplar.append(torch.rand(1, size))
+    out = model(examplar)
     print('output shape', out.shape) 
     model = model.to(device)
         
-    X_train, y_train, X_test, y_test, groups_train, groups_test = X[0][train_index], y[train_index], X[0][test_index], y[test_index], groups[train_index], groups[test_index]
-    train_loader = create_datasets([X_train], y_train)
-    test_loader = create_datasets([X_test], y_test)
+    X_train = [X_s[train_index] for X_s in X]
+    y_train = y[train_index]
+    X_test = [X_s[test_index] for X_s in X]
+    y_test = y[test_index]
+    groups_train = groups[train_index]
+    groups_test = groups[test_index]
+    train_loader = create_datasets(X_train, y_train)
+    test_loader = create_datasets(X_test, y_test)
     
     optimizer = getattr(optim, optmizer_name)(model.parameters(), lr=lr)
     start_epoch = 0
@@ -191,14 +248,14 @@ for i, (train_index, test_index) in enumerate(splitter.split(X[0], y, groups=gro
     pbar = trange(num_epochs, desc='Epoch', unit='epoch', initial=start_epoch, position=0, disable=not args.debug)
     # Iterate over data.
     for epoch in pbar:
-        model, train_stats = train_epoch_single(model, train_loader, criterion, optimizer, device)
+        model, train_stats = train_epoch_multi(model, train_loader, criterion, optimizer, device)
 
         if writer:
             writer.add_scalar('time eplased', time.time() - since, epoch)
             for stat in train_stats:
                 writer.add_scalar(stat, train_stats[stat], epoch)
             if epoch+1==num_epochs or (frequency>0 and epoch%frequency==0):
-                preds, test_stats = test_single(model, test_loader, device)
+                preds, test_stats = test_multi(model, test_loader, device)
                 # compute group level confusion matrix
                 cfms = metrics.get_group_confusion_matrix(preds.squeeze(), y_test.squeeze(), groups=groups_test)
                 metrics_dict.update(metrics.compute_metrics(cfms, desired_metrics))

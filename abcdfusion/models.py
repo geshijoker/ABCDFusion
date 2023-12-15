@@ -67,6 +67,24 @@ class LinearClassifier(nn.Module):
         x = self.project(x)
         return x
     
+class Ensemble(nn.Module):
+    def __init__(self, discriminator, *models):
+        super().__init__()
+        self.extractors = []
+        for model in models:
+            self.extractors.append(model)
+        self.classifier = discriminator
+        self.n_models = len(self.extractors)
+        
+    def forward(self, xs: List[Tensor])-> Tensor:
+        assert len(xs) == self.n_models, f'There are {len(xs)} input tensors but only {self.n_models} feature extractors'
+        features = []
+        for x, model in zip(xs, self.extractors):
+            features.append(model(x))
+        x = torch.cat(features, dim=1)
+        x = self.classifier(x)
+        return x
+    
 # Define a GCN model that considers edge weights
 class GCNBlock(nn.Module):
     def __init__(self, in_feat, out_feat):
