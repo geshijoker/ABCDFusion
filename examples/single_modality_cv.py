@@ -40,6 +40,7 @@ from abcdfusion.preprocess import get_preprocess
 from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_single, test_single
 
 """
+This is the script to run cross validation with single modality.
 example command to run the script:
 python examples/single_modality_cv.py -c ./configs.yaml -e ./runs/single/DTI -n 0 -m DTI -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
 """
@@ -174,7 +175,7 @@ for i, (train_index, test_index) in enumerate(splitter.split(X[0], y, groups=gro
         )
     out = model(torch.rand(1, input_size))
     print('output shape', out.shape) 
-    model = model.to(device)
+    model.to(device)
         
     X_train, y_train, X_test, y_test, groups_train, groups_test = X[0][train_index], y[train_index], X[0][test_index], y[test_index], groups[train_index], groups[test_index]
     train_loader = create_datasets([X_train], y_train)

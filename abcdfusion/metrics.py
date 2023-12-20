@@ -12,6 +12,9 @@ from typing import Union
 EPS = 1e-7
 
 def get_accuracy(cfm):
+    """
+    From 2x2 comfusion matrix to accuracy
+    """
     tp = cfm[1][1]
     fp = cfm[0][1]
     fn = cfm[1][0]
@@ -19,6 +22,9 @@ def get_accuracy(cfm):
     return (tp+tn)/(tp+fp+fn+tn)
 
 def get_precision(cfm):
+    """
+    From 2x2 comfusion matrix to precision
+    """
     tp = cfm[1][1]
     fp = cfm[0][1]
     fn = cfm[1][0]
@@ -26,6 +32,9 @@ def get_precision(cfm):
     return tp/(tp+fp)
 
 def get_recall(cfm):
+    """
+    From 2x2 comfusion matrix to recall
+    """
     tp = cfm[1][1]
     fp = cfm[0][1]
     fn = cfm[1][0]
@@ -33,14 +42,30 @@ def get_recall(cfm):
     return tp/(tp+fn)
 
 def get_f1(cfm):
+    """
+    From 2x2 comfusion matrix to f1 score
+    """
     precision = get_precision(cfm)
     recall = get_recall(cfm)
     return 2*precision*recall/(precision+recall)
 
 def get_confusion_matrix(preds, gtrue):
+    """
+    Compute confusion matrix from predictions and ground truth annotations
+    Args: 
+        preds: numpy array of predictions
+        gtrue: numpy array of target labels
+    Returns:
+        2x2 confusion matrix
+    """
     return confusion_matrix(gtrue, preds)
 
 def get_group_confusion_matrix(preds, gtrue, groups):
+    """
+    Compute confusion matrix from predictions and ground truth annotations for each group given an array of groups
+    Returns:
+        A dictionary of confusion matrix for each group
+    """
     cfm = {}
     group_set = set(groups)
     for group in group_set:
@@ -51,9 +76,20 @@ def get_group_confusion_matrix(preds, gtrue, groups):
     return cfm
     
 def count_support(cfm):
+    """
+    Count the number of instances to support the confusion matrix
+    """
     return np.sum(cfm)
 
 def compute_metric(cfm, metrics_list:List['str']=None):
+    """
+    Compute a list named metrics from a confusion matrix
+    Args:
+        cfm: 2x2 confusion matrix
+        metrics_list: a list of predefined metric
+    Returns: 
+        A dictionary of (metric name, values computed from confusion matrix)
+    """
     ans = {}
     for metric_name in metrics_list:
         if metric_name == 'accuracy':
@@ -67,6 +103,14 @@ def compute_metric(cfm, metrics_list:List['str']=None):
     return ans
     
 def compute_metrics(cfm_dict, metrics_list:List['str']=None):
+    """
+    Compute a list named metrics from a confusion matrices of groups
+    Args:
+        cfm_dict: a dictionary of (group, confusion matrix)
+        metrics_list: a list of predefined metric
+    Returns: 
+        A nested dictionary of (number of instances in the group, (group, metrics values))
+    """
     ans = {}
     for group, cfm in cfm_dict.items():
         ans[group] = {'support': int(count_support(cfm))}
@@ -74,6 +118,9 @@ def compute_metrics(cfm_dict, metrics_list:List['str']=None):
     return ans
 
 class DiceLoss(nn.Module):
+    """
+    Dice loss -- https://paperswithcode.com/method/dice-loss
+    """
     def __init__(self, softmax=False):
         super(DiceLoss, self).__init__()
         self.softmax = softmax
@@ -118,6 +165,7 @@ class WeightedBCELoss(nn.Module):
 class FocalLoss(nn.Module):
     """Computes the focal loss between input and target
     as described here https://arxiv.org/abs/1708.02002v2
+    Focal loss applies a modulating term to the cross entropy loss in order to focus learning on hard misclassified examples. It is a dynamically scaled cross entropy loss, where the scaling factor decays to zero as confidence in the correct class increases. 
 
     Args:
         gamma (float):  The focal loss focusing parameter.

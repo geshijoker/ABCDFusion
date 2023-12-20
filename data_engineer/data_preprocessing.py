@@ -20,33 +20,33 @@ else:
 sheet_names = dfs.keys()
 print('Raw data loaded. The loaded panda frames are', sheet_names)
 
-# DTIconnectivity data
+# DTIconnectivity data clearning and filtering
 dfs['DTIconnectivity'] = dfs['DTIconnectivity'].dropna()
 dfs['DTIconnectivity'] = dfs['DTIconnectivity'][dfs['DTIconnectivity']['imgincl_dmri_include'] == 1] 
 dfs['DTIconnectivity'] = dfs['DTIconnectivity'].loc[dfs['DTIconnectivity']['age'] >= 10]
 dfs['DTIconnectivity'].drop('imgincl_dmri_include', inplace=True, axis=1)
 dfs['DTIconnectivity'].rename(columns={'sex_1isM': 'sex'}, inplace=True)
 
-# RestingState data
+# RestingState data clearning and filtering
 dfs['RestingState'] = dfs['RestingState'].dropna()
 dfs['RestingState'] = dfs['RestingState'][dfs['RestingState']['imgincl_rsfmri_include'] == 1]
 dfs['RestingState'] = dfs['RestingState'].loc[dfs['RestingState']['age'] >= 10]
 dfs['RestingState'].drop('imgincl_rsfmri_include', inplace=True, axis=1)
 dfs['RestingState'].rename(columns={'sex_1isM': 'sex'}, inplace=True)
 
-# Corticalthickness data
+# Corticalthickness data clearning and filtering
 dfs['Corticalthickness'] = dfs['Corticalthickness'].dropna()
 dfs['Corticalthickness'] = dfs['Corticalthickness'][dfs['Corticalthickness']['imgincl_t1w_include'] == 1] 
 dfs['Corticalthickness'] = dfs['Corticalthickness'].loc[dfs['Corticalthickness']['yr2_age'] >= 10]
 dfs['Corticalthickness'].drop(['eventname','imgincl_t1w_include'], inplace=True, axis=1)
 dfs['Corticalthickness'].rename(columns={'yr2_age': 'age'}, inplace=True)
 
-# other data
+# other data clearning and filtering
 dfs['otherdata'] = dfs['otherdata'].dropna()
 dfs['otherdata'] = dfs['otherdata'].loc[dfs['otherdata']['ageat2yr'] >= 10]
 dfs['otherdata'].rename(columns={'ageat2yr': 'age'}, inplace=True)
 
-# other data
+# outcome data clearning and filtering
 dfs['outcome'] = dfs['outcome'].dropna()
 dfs['outcome'].drop(dfs['outcome'].iloc[:, 2:], axis = 1, inplace=True)
 
@@ -64,6 +64,7 @@ for sheet_name, df in filtered_dfs.items():
     df.set_index('src_subject_id', inplace=True)
     print(sheet_name, '{} of subjects are sorted, with {} nan'.format(len(df)-1, df.isnull().values.any()))
     
+# Move the age, sex, site to the outcome file to remove duplication
 assert filtered_dfs['DTIconnectivity']['age'].equals(filtered_dfs['RestingState']['age']) and filtered_dfs['RestingState']['age'].equals(filtered_dfs['Corticalthickness']['age']) and filtered_dfs['Corticalthickness']['age'].equals(filtered_dfs['otherdata']['age']), 'ages do not match'
 
 assert filtered_dfs['DTIconnectivity']['sex'].equals(filtered_dfs['RestingState']['sex']) and filtered_dfs['RestingState']['sex'].equals(filtered_dfs['Corticalthickness']['sex']), 'sex do not match'

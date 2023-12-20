@@ -4,7 +4,9 @@ import time
 import logging
 
 def check_make_dir(path):
-
+    """
+    Check if a directory exists given the path, if not create one.
+    """
     # You should change 'test' to your preferred folder.
     mydir = os.path.join('./', path)
     check_folder = os.path.isdir(mydir)
@@ -18,6 +20,9 @@ def check_make_dir(path):
     return mydir
 
 def clean_directory(path):
+    """
+    Clean the folders of files that should be disclosed in a linux style system
+    """
     for root, dirs, files in os.walk(path):
         # Remove .DS_Store files
         for file in files:

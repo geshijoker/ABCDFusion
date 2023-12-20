@@ -12,9 +12,9 @@ METRICS:
 DTI:
     architecture: 'mlp'
     layers:
-        - 50
-        - 50
-        - 50
+        - 20
+        - 40
+        - 20
     
 RS:
     architecture: 'mlp'
@@ -26,9 +26,9 @@ RS:
 CORT:
     architecture: 'mlp'
     layers:
+        - 50
         - 150
-        - 150
-        - 150
+        - 50
     
 OTHER:
     architecture: 'mlp'

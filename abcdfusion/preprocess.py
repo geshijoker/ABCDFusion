@@ -6,6 +6,14 @@ import numpy as np
 from sklearn import preprocessing
 
 def get_preprocess(arrays, modalities, group_site=True, combine=True):
+    """
+    Preprocess arrays of multiple modalities and return lists of feature arrays, labels and groups
+    Args:
+        arrays: numpy arrays of 
+        modalities: a list of names of modalities
+        group_site: If group site is true return the group ids along with feature arrays and labels
+        combine: whether age and sex features are used in each modality or not
+    """
     # X_dti, X_rs, X_other, X_cort, X_anno
     X_anno = arrays.pop()
     if group_site:

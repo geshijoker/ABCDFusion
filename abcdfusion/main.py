@@ -12,12 +12,16 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 from torch.utils.data.sampler import SubsetRandomSampler
 from torch.utils.data import Dataset, TensorDataset, DataLoader
+from torcheval.metrics.aggregation.auc import AUC
 
 from abcdfusion import metrics
 from abcdfusion import models
 from abcdfusion import utils
 
 def get_abcd(DTI_csv, rsfMRI_csv, other_csv, cort_csv, label_csv):
+    """
+    Load CSV files into numpy arrays
+    """
     df_dti = pd.read_csv(DTI_csv, index_col=0)
     df_rs = pd.read_csv(rsfMRI_csv, index_col=0)
     df_other = pd.read_csv(other_csv, index_col=0)
@@ -33,6 +37,9 @@ def get_abcd(DTI_csv, rsfMRI_csv, other_csv, cort_csv, label_csv):
     return [X_dti, X_rs, X_other, X_cort, X_anno]
 
 def get_cv_splits(n_splits=0, group_site=True):
+    """
+    Retrieve cross validation 
+    """
     # groups: site
     if n_splits<=0 and group_site:
         splitter = LeaveOneGroupOut()
@@ -45,6 +52,9 @@ def get_cv_splits(n_splits=0, group_site=True):
     return splitter
 
 def create_datasets(arrays, y):
+    """
+    numpy arrays to tensors
+    """
     # obtain training indices that will be used for validation
     # groups: age, sex, site
     
@@ -56,6 +66,12 @@ def create_datasets(arrays, y):
     return dataloader
 
 def train_epoch_single(model, dataloader, criterion, optimizer, device):
+    """
+    Train a model with single modality
+    Returns: 
+        model: pytorch model
+        train_stats: dictionary of training stats such as loss
+    """
     epoch_loss = 0.0
     epoch_acc = 0.0
     count = 0
@@ -90,6 +106,12 @@ def train_epoch_single(model, dataloader, criterion, optimizer, device):
     return model, train_stats
 
 def test_single(model, dataloader, device):
+    """
+    Test a model with single modality
+    Returns:
+        predictions: numpy array
+        test_stats: dictionary of test stats such as accuracy
+    """
     since = time.time()
     model.eval()   # Set model to evaluate mode
     
@@ -123,6 +145,12 @@ def test_single(model, dataloader, device):
     return preds.detach().cpu().numpy(), test_stats
 
 def train_epoch_multi(model, dataloader, criterion, optimizer, device):
+    """
+    Train an emsemble model with multiple modalities
+    Returns: 
+        model: pytorch model
+        train_stats: dictionary of training stats such as loss
+    """
     epoch_loss = 0.0
     epoch_acc = 0.0
     count = 0
@@ -157,6 +185,12 @@ def train_epoch_multi(model, dataloader, criterion, optimizer, device):
     return model, train_stats
 
 def test_multi(model, dataloader, device):
+    """
+    Test an emsemble model with multiple modalities
+    Returns:
+        predictions: numpy array
+        test_stats: dictionary of test stats such as accuracy
+    """
     since = time.time()
     model.eval()   # Set model to evaluate mode
     
@@ -179,12 +213,17 @@ def test_multi(model, dataloader, device):
             corrects += torch.sum(preds == targets.data)/np.prod(preds.size())*batch_size
 
     acc = corrects.double().item() / count
+    
+    metric = AUC()
+    metric.update(preds.data, targets.data)
+    auc = metric.compute()
 
     time_elapsed = time.time() - since
     print(f'Testing complete in {time_elapsed // 60:.0f}m {time_elapsed % 60:.0f}s, Test Acc: {100. * acc}')
     
     test_stats = {
         "test_acc": 100. * acc,
+        "test_auc": auc[0],
     }
 
     return preds.detach().cpu().numpy(), test_stats

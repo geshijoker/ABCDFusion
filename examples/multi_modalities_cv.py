@@ -40,6 +40,7 @@ from abcdfusion.preprocess import get_preprocess
 from abcdfusion import get_abcd, get_cv_splits, create_datasets, train_epoch_multi, test_multi
 
 """
+This is the script to run cross validation with multiple modalities.
 example command to run the script:
 python examples/multi_modalities_cv.py -c ./configs.yaml -e ./runs/multi -n 0 -m DTI RS CORT OTHER -l bce -s 42 -g -1 -f 0 -ne 10 -op 'SGD' -lr 0.0001 -do 0.0 -b -d
 """

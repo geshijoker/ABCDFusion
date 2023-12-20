@@ -10,6 +10,9 @@ import dgl
 from dgl.nn import GraphConv
 
 class LinearBlock(nn.Module):
+    """
+    Linear block
+    """
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
         self.net = nn.Sequential(
@@ -22,6 +25,9 @@ class LinearBlock(nn.Module):
         return x
         
 class ResidualBlock(nn.Module):
+    """
+    A residual block consists of 2 Linear blocks with skip connection
+    """
     def __init__(self, in_channels: int, emb_size: int):
         super(ResidualBlock, self).__init__()
         self.linear1 = nn.Sequential(LinearBlock(in_channels, emb_size),
@@ -38,6 +44,13 @@ class ResidualBlock(nn.Module):
         return out
 
 class BinaryMLP(nn.Module):
+    """
+    A multilayer layer perceptron feature extractor
+    Args:
+        in_channels: number of features of input
+        sizes: the widths of all layers
+        hidden_dim: The size of hidden layer of ResidualBlock. If not None, ResidualBlock is used, else, LinearBlock is used.
+    """
     def __init__(self, in_channels: int, sizes: List[int], hidden_dim: int=None):
         super().__init__()
         if hidden_dim:
@@ -57,6 +70,12 @@ class BinaryMLP(nn.Module):
         return x
     
 class LinearClassifier(nn.Module):
+    """
+    One layer binary classification that should be used at the end of any feature extractors
+    Args:
+        in_channels: the number of extracted features
+        p: the dropout probablity at training stage
+    """
     def __init__(self, in_channels: int, p: int=0.1):
         super().__init__()
         self.dropout = nn.Dropout(p)
@@ -68,6 +87,12 @@ class LinearClassifier(nn.Module):
         return x
     
 class Ensemble(nn.Module):
+    """
+    The ensemble model that uses multiple models to extrac features and one classifier to make prediction. The entire process is end-to-end trained.
+    Args:
+        discriminator: the classifier, normally a LinearClassifier
+        models: the models used as feature extractors
+    """
     def __init__(self, discriminator, *models):
         super().__init__()
         self.extractors = []
@@ -85,8 +110,10 @@ class Ensemble(nn.Module):
         x = self.classifier(x)
         return x
     
-# Define a GCN model that considers edge weights
 class GCNBlock(nn.Module):
+    """
+    Define a graph convolutional network block
+    """
     def __init__(self, in_feat, out_feat):
         self.conv = GraphConv(in_feat, out_feats)
         
@@ -95,6 +122,9 @@ class GCNBlock(nn.Module):
         return x
 
 class GCNWithEdgeWeights(nn.Module):
+    """
+    Define a graph convolutional networks model that considers edge weights
+    """
     def __init__(self, in_feats, hid_sizes, out_feats):
         super(GCNWithEdgeWeights, self).__init__()
         self.blocks = nn.ModuleList([
