@@ -28,7 +28,7 @@ foo@bar:~$ pip install -r requirements.txt --force-reinstall
 foo@bar:~$ pip install -r requirements.txt --ignore-installed
 ```
 
-# Installa from Source Code
+# Install from Source Code
 ## Ensure pip, setuptools, and wheel are up to date
 ```console
 foo@bar:~$ python3 -m pip install --upgrade pip setuptools wheel
