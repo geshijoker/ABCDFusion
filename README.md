@@ -28,7 +28,7 @@ foo@bar:~$ pip install -r requirements.txt --force-reinstall
 foo@bar:~$ pip install -r requirements.txt --ignore-installed
 ```
 
-# Installation from Source Code
+# Installa from Source Code
 ## Ensure pip, setuptools, and wheel are up to date
 ```console
 foo@bar:~$ python3 -m pip install --upgrade pip setuptools wheel
@@ -47,17 +47,17 @@ foo@bar:~$ python3 -m pip install .
 foo@bar:~$ python3 -m pip install -e .
 ```
 
-## Use Tensorboard to Visualize the Training Procedures and Recorded Statistics
-### Installation
+# Use Tensorboard to Visualize the Training Procedures and Recorded Statistics
+## Installation
 ```console
 foo@bar:~$ pip install tensorboard
 foo@bar:~$ tensorboard --logdir=runs
 ```
-### Start from a local computer if the stats are saved in folder_to_exps
+## Start from a local computer if the stats are saved in folder_to_exps
 ```console
 foo@bar:~$ tensorboard --logdir=folder_to_exps
 ```
-### Start from a remote computer if the stats are saved in folder_to_exps
+## Start from a remote computer if the stats are saved in folder_to_exps
 ```console
 foo-remote@bar-remote:~$ tensorboard --logdir folder_to_exps --port 6006
 foo@bar:~$ ssh -N -f -L localhost:16006:localhost:6006 foo-remote@bar-remote
