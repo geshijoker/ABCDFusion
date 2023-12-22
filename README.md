@@ -46,6 +46,10 @@ foo@bar:~$ python3 -m pip install .
 ```console
 foo@bar:~$ python3 -m pip install -e .
 ```
+## To deactivate the virtual environment after using it.
+```console
+foo@bar:~$ deactivate abcd_env
+```
 
 # Use Tensorboard to Visualize the Training Procedures and Recorded Statistics
 ## Installation

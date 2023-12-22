@@ -155,6 +155,7 @@ cython_debug/
 # Customize
 exps/
 runs/
+abcd_env/
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

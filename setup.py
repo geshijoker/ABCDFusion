@@ -17,7 +17,7 @@ setup(
     description='A python package to work on ABCD dataset',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url='https://github.com/geshijoker/ABCDFusion/tree/dev',
+    url='https://github.com/geshijoker/ABCDFusion/tree/main',
     license='MIT',
     classifiers=[
         'Development Status :: 0.0',
